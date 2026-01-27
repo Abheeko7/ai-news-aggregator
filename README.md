@@ -255,6 +255,34 @@ This keeps costs low while providing intelligent summarization.
 
 ---
 
+## 🗺️ Roadmap & Future Plans
+
+### Current Status
+✅ **Phase 1: Core Functionality** - Complete
+- Multi-source content aggregation
+- AI-powered summarization
+- Automated email delivery
+- Local development setup
+
+### Next Steps
+
+**🚀 Phase 2: Deployment** (In Progress)
+- Cloud deployment on Render
+- Production-ready infrastructure
+- Automated daily execution via cron jobs
+- API endpoints for manual triggers
+
+**👥 Phase 3: Multi-Subscriber Support** (Planned)
+- User subscription management system
+- Customizable newsletter preferences
+- **Source Selection**: Subscribers can choose which sources they want (YouTube, OpenAI, Anthropic, F1)
+- **Content Filtering**: Options to filter by topics, keywords, or categories
+- **Delivery Frequency**: Choose daily, weekly, or custom schedules
+- **Personalization**: AI-powered content recommendations based on reading preferences
+- Unsubscribe management and email preferences
+
+---
+
 ## 🤝 Contributing
 
 This is a personal project, but suggestions and improvements are welcome!
