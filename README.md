@@ -1,50 +1,279 @@
-# AI News Aggregator - Live Build Repository
+# 🤖 AI News Aggregator
 
-This repository accompanies my 3-hour live coding session where I build a complete AI-powered news aggregator from scratch. This is a **private repository** containing valuable implementation details and deployment strategies used in production environments.
+An intelligent, automated news aggregation system that collects AI-related content from multiple sources, processes it with AI, and delivers a curated daily newsletter directly to your inbox.
 
-## Project Structure
+## 📖 What is This Project?
 
-This project is organized across three branches, each corresponding to a different phase of the build:
+**AI News Aggregator** is a Python-based automation system that:
+- **Scrapes** AI news from top sources (YouTube channels, OpenAI blog, Anthropic research, Formula 1 AI content)
+- **Processes** content using AI to extract transcripts, convert markdown, and generate summaries
+- **Curates** the most relevant articles using AI-powered ranking
+- **Delivers** a beautifully formatted daily email digest with featured articles and additional links
 
-- **`master`** - Part 1: Local setup and core functionality
-- **`deployment`** - Part 2: Deployment configuration and infrastructure
-- **`deployment-final`** - Part 3: Final optimizations and production-ready changes
+Perfect for staying up-to-date with the latest developments in AI without manually checking multiple sources every day.
 
-Each branch serves as an intermediate checkpoint, allowing you to reference the exact state of the codebase at any point during the video.
+---
 
-## How This Video Works
+## 🎯 What Does This Project Do?
 
-This is a **live coding build**, not a traditional step-by-step tutorial. Here's what to expect:
+### Core Functionality
 
-- **Fast-paced development** - I code at my natural pace, leveraging AI tools extensively
-- **AI-assisted workflow** - You won't see every code snippet or file generation in real-time
-- **Real-world approach** - This condenses 20-40 hours of learning into a single session
-- **Not cookie-cutter** - Unlike structured tutorials, this reflects how coding actually happens in practice
+1. **Multi-Source Content Collection**
+   - 🎬 **YouTube**: Scrapes videos from configured AI-focused channels
+   - 🤖 **OpenAI**: Fetches blog posts and announcements from OpenAI
+   - 🧠 **Anthropic**: Collects research papers and engineering updates from Anthropic
+   - 🏎️ **Formula 1**: Gathers AI-related Formula 1 content
 
-## How to Follow Along
+2. **Intelligent Content Processing**
+   - Extracts and processes YouTube video transcripts
+   - Converts Anthropic markdown articles to readable format
+   - Stores all content in PostgreSQL database for efficient retrieval
 
-### Recommended Approach (Maximum Learning)
+3. **AI-Powered Summarization**
+   - Uses Google Gemini API to generate concise, informative summaries
+   - Creates compelling titles and 2-3 sentence summaries for featured articles
+   - Focuses on actionable insights and key implications
 
-1. **Clone this repository** before starting the video
-2. **Keep a local copy ready** on your system as you code along
-3. **Use intermediate checkpoints** - When I make major updates or run tests, pause and:
-   - Reference the corresponding branch in this repository
-   - Copy relevant code snippets into your project
-   - Use AI coding assistants to help you reach the same checkpoint
-4. **Iterate step-by-step** - Don't rush ahead. Ensure each phase works before moving forward
-5. **Expect confusion** - Some parts will move fast and may not be immediately clear. This is where real learning happens
+4. **Smart Curation & Ranking**
+   - AI-powered curator ranks articles by relevance and importance
+   - Selects top articles from each source for featured section
+   - Includes additional links grouped by source
 
-### Alternative Approach (Not Recommended)
+5. **Automated Email Delivery**
+   - Generates beautifully formatted HTML email newsletters
+   - Includes personalized introduction using AI
+   - Sends daily digest to your email address
 
-You can skip ahead to the `deployment-final` branch and try to get everything working, but you'll miss the iterative problem-solving process that makes this valuable.
+---
 
-## Why This Approach?
+## 🔄 Project Flow
 
-Traditional tutorials show you the "right way" to do things. This video shows you the **real way** - with AI assistance, rapid iteration, debugging, and adapting on the fly. By following along and hitting the same checkpoints, you'll:
+### Daily Pipeline Execution
 
-- Learn how to effectively leverage AI coding tools
-- Understand the thought process behind architectural decisions
-- Experience real-world development workflows
-- Build muscle memory through hands-on practice
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    DAILY PIPELINE                            │
+└─────────────────────────────────────────────────────────────┘
 
-**The most valuable learning happens when you struggle, reference the code, and push through to the next checkpoint.**
+Step 0: 🗑️  Cleanup
+├─ Deletes data older than 7 days
+└─ Keeps database size manageable
+
+Step 1: 📡 Scraping
+├─ YouTube: Fetch latest videos from configured channels
+├─ OpenAI: Get recent blog posts from RSS feed
+├─ Anthropic: Collect articles from research/engineering feeds
+└─ Formula 1: Gather AI-related F1 content
+
+Step 2: 📄 Processing
+├─ Anthropic: Convert markdown articles to readable format
+└─ YouTube: Extract and process video transcripts
+
+Step 3: 🤖 AI Digests
+├─ Select top 1 article from each source (past 24 hours)
+├─ Generate AI summaries using Gemini API
+└─ Create compelling titles and summaries
+
+Step 4: 📧 Newsletter Generation
+├─ Rank articles by relevance (AI-powered curator)
+├─ Generate personalized email introduction
+├─ Format featured articles with AI summaries
+├─ Add additional links grouped by source
+└─ Send beautiful HTML email to MY_EMAIL
+
+┌─────────────────────────────────────────────────────────────┐
+│                    RESULT                                    │
+└─────────────────────────────────────────────────────────────┘
+📬 Daily email digest delivered to your inbox!
+```
+
+### Newsletter Format
+
+Each email includes:
+
+- **🎬 YOUTUBE** - Featured video with AI-generated summary
+- **🤖 OPENAI** - Featured blog post with AI summary
+- **🧠 ANTHROPIC** - Featured research/update with AI summary
+- **🏎️ F1** - Featured Formula 1 AI content with summary
+- **📚 MORE ARTICLES** - Additional links organized by source
+
+---
+
+## 🏗️ Architecture
+
+### Technology Stack
+
+- **Language**: Python 3.12+
+- **Database**: PostgreSQL (SQLAlchemy ORM)
+- **AI API**: Google Gemini (for summaries and curation)
+- **Email**: SMTP (Gmail)
+- **Web Framework**: Flask (for API endpoints)
+- **Scraping**: RSS feeds, YouTube API, feedparser
+
+### Key Components
+
+```
+app/
+├── scrapers/          # Content scrapers for each source
+│   ├── youtube.py
+│   ├── openai.py
+│   ├── anthropic.py
+│   └── formula1.py
+├── services/          # Processing services
+│   ├── process_anthropic.py
+│   ├── process_youtube.py
+│   ├── process_digest.py
+│   └── process_email.py
+├── agent/             # AI agents
+│   ├── digest_agent.py    # Generates summaries
+│   ├── curator_agent.py    # Ranks articles
+│   └── email_agent.py      # Creates email content
+├── database/          # Database layer
+│   ├── models.py          # SQLAlchemy models
+│   ├── repository.py      # Data access layer
+│   └── connection.py      # Database connection
+└── daily_runner.py    # Main pipeline orchestrator
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Python 3.12+
+- PostgreSQL database
+- Google Gemini API key
+- Gmail account with app password
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/ai-news-aggregator.git
+   cd ai-news-aggregator
+   ```
+
+2. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   # or using uv
+   uv sync
+   ```
+
+3. **Set up environment variables**
+   ```bash
+   cp app/example.env .env
+   # Edit .env with your credentials
+   ```
+
+4. **Configure database**
+   ```bash
+   # Start PostgreSQL (using Docker)
+   cd docker && docker-compose up -d && cd ..
+   
+   # Create tables
+   python app/database/create_tables.py
+   ```
+
+5. **Run the pipeline**
+   ```bash
+   python main.py
+   ```
+
+---
+
+## 📊 Features
+
+- ✅ **Automated Daily Execution** - Runs automatically via cron job
+- ✅ **Multi-Source Aggregation** - Collects from 4+ sources
+- ✅ **AI-Powered Summaries** - Uses Gemini for intelligent summarization
+- ✅ **Smart Curation** - AI ranks articles by relevance
+- ✅ **Beautiful Email Format** - Professional HTML newsletter design
+- ✅ **Data Retention** - Automatically cleans up old data (7-day retention)
+- ✅ **API Endpoints** - Flask API for manual triggers and health checks
+- ✅ **Error Handling** - Robust error handling and logging
+
+---
+
+## 🔧 Configuration
+
+Key configuration options (in `app/api_config.py`):
+
+- `SCRAPE_HOURS`: How far back to scrape (default: 168 hours / 7 days)
+- `NEWSLETTER_HOURS`: Articles to include in newsletter (default: 24 hours)
+- `DATA_RETENTION_HOURS`: How long to keep data (default: 168 hours / 7 days)
+- `TOP_PER_SOURCE`: Featured articles per source (default: 1)
+- `ADDITIONAL_LINKS_PER_SOURCE`: Extra links per source (default: 5)
+
+---
+
+## 📝 Environment Variables
+
+Required environment variables:
+
+```env
+# AI API
+GEMINI_API_KEY=your_gemini_api_key
+
+# Email Configuration
+MY_EMAIL=your_email@gmail.com
+APP_PASSWORD=your_gmail_app_password
+
+# Database (local development)
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=ai_news_aggregator
+
+# Or use DATABASE_URL for cloud deployment
+# DATABASE_URL=postgresql://user:password@host:port/database
+```
+
+---
+
+## 🌐 Deployment
+
+The project includes deployment configuration for **Render**:
+
+- **Database**: PostgreSQL (free tier)
+- **Web Service**: Flask API with `/health` and `/trigger-newsletter` endpoints
+- **Cron Job**: Automated daily execution
+
+See `RENDER_DEPLOYMENT_GUIDE.md` for detailed deployment instructions.
+
+---
+
+## 📈 API Usage
+
+The system uses approximately **5 API calls per run**:
+- 4 calls for AI digests (1 per source)
+- 1 call for email introduction/curation
+
+This keeps costs low while providing intelligent summarization.
+
+---
+
+## 🤝 Contributing
+
+This is a personal project, but suggestions and improvements are welcome!
+
+---
+
+## 📄 License
+
+This project is open source and available for educational purposes.
+
+---
+
+## 🙏 Acknowledgments
+
+- **Google Gemini** for AI summarization
+- **OpenAI, Anthropic** for providing RSS feeds
+- **YouTube** for video content
+- **PostgreSQL** for reliable data storage
+
+---
+
+**Built with ❤️ using Python and AI**
