@@ -35,8 +35,7 @@ services:
           property: connectionString
       - key: PYTHON_VERSION
         value: "3.12.3"
-      - key: PORT
-        value: "5000"
+      # PORT: Do NOT set. Render injects PORT (default 10000) - override causes 502.
       - key: CRON_SECRET
         sync: false   # Optional. Set in Render + GitHub secrets. Leave empty for no protection.
       - key: GEMINI_API_KEY
