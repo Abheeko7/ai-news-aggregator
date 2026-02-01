@@ -1,0 +1,122 @@
+name: Daily Newsletter Trigger
+
+# Triggers the newsletter pipeline daily via Render /trigger-newsletter.
+# Uses GitHub Actions (free) instead of Render cron (paid).
+# Pipeline: scrape → process → digest → send to MY_EMAIL.
+
+on:
+  schedule:
+    - cron: '0 8 * * *'   # Daily at 8:00 AM UTC
+  workflow_dispatch:       # Manual trigger from GitHub Actions tab
+
+jobs:
+  trigger-newsletter:
+    runs-on: ubuntu-latest
+    name: Trigger Newsletter Pipeline
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Trigger Newsletter Endpoint
+        env:
+          RENDER_URL: ${{ secrets.RENDER_SERVICE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          echo "🚀 Triggering newsletter pipeline..."
+          echo "Service URL: $RENDER_URL"
+          
+          CURL_CMD="curl -s -w '\n%{http_code}' -X POST '$RENDER_URL/trigger-newsletter' -H 'Content-Type: application/json'"
+          if [ -n "$CRON_SECRET" ]; then
+            CURL_CMD="$CURL_CMD -H 'X-Cron-Secret: $CRON_SECRET'"
+          fi
+          
+          response=$(eval "$CURL_CMD" || echo "000")
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+          
+          echo "Response Code: $http_code"
+          echo "Response Body: $body"
+          
+          if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 201 ]; then
+            echo "✅ Newsletter pipeline triggered successfully!"
+            echo "$body" | jq '.' 2>/dev/null || echo "$body"
+          else
+            echo "❌ Failed to trigger newsletter. HTTP Code: $http_code"
+            echo "$body"
+            exit 1
+          fi
+      
+      - name: Display Summary
+        if: success()
+        run: |
+          echo "📧 Pipeline completed. Newsletter sent to MY_EMAIL."
+          echo "Check Render service logs for details."
+```
+
+---
+
+## Part 3: Testing
+
+### Test Render Directly
+
+```bash
+curl -X POST https://YOUR-SERVICE.onrender.com/trigger-newsletter
+```
+
+Replace `YOUR-SERVICE` with your actual Render service name.
+
+### Test GitHub Actions
+
+1. **Actions** tab → **Daily Newsletter Trigger** → **Run workflow**
+2. Click the run to see logs
+3. You should see: `✅ Newsletter pipeline triggered successfully!`
+4. Check your email for the newsletter
+
+---
+
+## Schedule
+
+The workflow runs:
+- **Automatically:** Every day at 8:00 AM UTC
+- **Manually:** Actions tab → Run workflow
+
+---
+
+## Troubleshooting
+
+### "RENDER_SERVICE_URL is empty"
+- Add the secret in GitHub: Settings → Secrets → Actions
+- Use the full URL: `https://ai-news-api-xxxx.onrender.com`
+- No trailing slash
+
+### "401 Unauthorized"
+- If you set CRON_SECRET in Render, you must set the **same** value in GitHub secrets
+- If you want no protection, leave CRON_SECRET empty in both places
+
+### "Connection refused" or timeout
+- Render free tier spins down after ~15 min of inactivity
+- First request may take 30–60 seconds to "wake up" the service
+- The workflow may need to wait longer on first run — check Render logs
+
+### Workflow not appearing
+- Ensure `.github/workflows/newsletter.yml` is committed and pushed
+- Check you're on the correct branch
+- GitHub may need a few minutes to detect new workflows
+
+---
+
+## Summary Checklist
+
+**Render:**
+- [ ] Blueprint created with `deployment` branch
+- [ ] Only database + web service (no cron job)
+- [ ] GEMINI_API_KEY, MY_EMAIL, APP_PASSWORD filled in
+- [ ] CRON_SECRET left empty (or set if you want protection)
+- [ ] Service URL copied for GitHub
+
+**GitHub:**
+- [ ] RENDER_SERVICE_URL secret added
+- [ ] CRON_SECRET secret added (only if you set it in Render)
+- [ ] Workflow file committed to repo
+- [ ] Manual test run successful
