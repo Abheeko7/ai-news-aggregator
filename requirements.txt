@@ -1,5 +1,6 @@
 # Auto-generated from pyproject.toml for Render deployment
 beautifulsoup4>=4.14.2
+resend>=2.0.0
 docling>=2.61.2
 feedparser>=6.0.12
 flask>=3.0.0

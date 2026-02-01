@@ -42,9 +42,13 @@ You'll see a "Specified configurations" screen. Fill in **only** for the **web s
 | **CRON_SECRET** | No | Leave **empty** or generate a secret (see below) | *(leave blank)* |
 | **GEMINI_API_KEY** | **Yes** | Your Google Gemini API key | `AIza...` |
 | **MY_EMAIL** | **Yes** | Email that receives newsletters | `you@gmail.com` |
-| **APP_PASSWORD** | **Yes** | Gmail app password | `abcd efgh ijkl mnop` |
+| **RESEND_API_KEY** | **Yes** | Resend API key (https://resend.com/api-keys) | `re_xxx...` |
+| **FROM_EMAIL** | No | Sender email (default: `onboarding@resend.dev`) | `onboarding@resend.dev` |
+| **APP_PASSWORD** | No | Gmail app password (only for local SMTP; not used on Render) | *(leave blank)* |
 
 **DATABASE_URL** is set automatically — do not enter it.
+
+**Note:** Resend is used on Render (SMTP is blocked on free tier). For local dev you can use either Resend or Gmail (APP_PASSWORD).
 
 ### Step 4: Skip or Ignore Cron Job Section
 
@@ -220,7 +224,7 @@ The workflow runs:
 **Render:**
 - [ ] Blueprint created with `deployment` branch
 - [ ] Only database + web service (no cron job)
-- [ ] GEMINI_API_KEY, MY_EMAIL, APP_PASSWORD filled in
+- [ ] GEMINI_API_KEY, MY_EMAIL, RESEND_API_KEY filled in
 - [ ] CRON_SECRET left empty (or set if you want protection)
 - [ ] Service URL copied for GitHub
 

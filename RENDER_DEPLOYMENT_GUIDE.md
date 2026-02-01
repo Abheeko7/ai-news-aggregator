@@ -8,9 +8,10 @@ Before starting, make sure you have:
 
 1. ✅ **GitHub account** with your repository pushed
 2. ✅ **Render account** (sign up at https://render.com)
-3. ✅ **Gmail App Password** (for sending emails)
-   - Go to Google Account → Security → 2-Step Verification → App passwords
-   - Generate an app password for "Mail"
+3. ✅ **Resend API Key** (for sending emails on Render — SMTP is blocked on free tier)
+   - Sign up at https://resend.com
+   - Create API key at https://resend.com/api-keys
+   - Use `onboarding@resend.dev` as sender for testing (or verify your domain)
 4. ✅ **Google Gemini API Key**
    - Get it from https://aistudio.google.com/apikey
 
@@ -54,9 +55,10 @@ When Render shows the "Specified configurations" screen, you'll need to set thes
 | `CRON_SECRET` | **No** | Leave **empty** (or set + add to GitHub secrets; see GITHUB_ACTIONS_SETUP.md) |
 | `GEMINI_API_KEY` | **Yes** | Your Google Gemini API key |
 | `MY_EMAIL` | **Yes** | Email address that receives newsletters (e.g., `yourname@gmail.com`) |
-| `APP_PASSWORD` | **Yes** | Gmail app password (16 characters, e.g., `abcd efgh ijkl mnop`) |
+| `RESEND_API_KEY` | **Yes** | Resend API key (from https://resend.com/api-keys) |
+| `FROM_EMAIL` | **No** | Sender email; default `onboarding@resend.dev` for testing |
 
-**Note:** `DATABASE_URL` is automatically set by Render. **No cron job** — newsletter is triggered by GitHub Actions (free). See GITHUB_ACTIONS_SETUP.md.
+**Note:** `DATABASE_URL` is automatically set by Render. **No cron job** — newsletter is triggered by GitHub Actions (free). See GITHUB_ACTIONS_SETUP.md. Resend is required on Render (Gmail SMTP is blocked on free tier).
 
 ---
 
@@ -153,9 +155,9 @@ After triggering (manual curl or GitHub Actions):
 ### Issue: Email not sending
 
 **Solution:**
-- Verify `MY_EMAIL` and `APP_PASSWORD` are correct
-- Check `APP_PASSWORD` is a Gmail app password (16 chars, not your regular password)
-- Check Render logs for SMTP errors
+- Verify `MY_EMAIL` and `RESEND_API_KEY` are set in Render
+- Ensure `FROM_EMAIL` is valid (use `onboarding@resend.dev` for testing)
+- Check Render logs for Resend API errors
 
 ### Issue: Newsletter not triggering automatically
 
@@ -210,15 +212,16 @@ To update your deployment:
 
 ## 📝 Environment Variables Reference
 
-### Required for Both Services:
+### Required for Web Service:
 
 - `GEMINI_API_KEY` - Google Gemini API key
 - `MY_EMAIL` - Email address to receive newsletters
-- `APP_PASSWORD` - Gmail app password
+- `RESEND_API_KEY` - Resend API key (required on Render; SMTP blocked on free tier)
 
-### Web Service Only:
+### Optional:
 
-- `CRON_SECRET` - Optional secret to protect `/trigger-newsletter`
+- `FROM_EMAIL` - Sender email; defaults to `onboarding@resend.dev`
+- `CRON_SECRET` - Secret to protect `/trigger-newsletter` (when using GitHub Actions)
 
 ### Auto-Set by Render:
 
@@ -234,6 +237,7 @@ After deployment, verify:
 
 - [ ] Database created successfully
 - [ ] Web service is running (`/health` returns 200)
+- [ ] RESEND_API_KEY and MY_EMAIL set in Render
 - [ ] GitHub Actions workflow set up (RENDER_SERVICE_URL secret)
 - [ ] Manual trigger works (`/trigger-newsletter` or Run workflow)
 - [ ] Email received successfully

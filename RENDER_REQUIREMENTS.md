@@ -19,8 +19,8 @@ Use this checklist before creating your Render blueprint instance.
 | Credential | Where to Get It | Used For |
 |------------|-----------------|----------|
 | **GEMINI_API_KEY** | https://aistudio.google.com/apikey | AI summarization |
-| **MY_EMAIL** | Your Gmail address | Receives newsletters |
-| **APP_PASSWORD** | Google Account → Security → 2-Step Verification → App passwords | Sending emails |
+| **MY_EMAIL** | Your email | Receives newsletters |
+| **RESEND_API_KEY** | https://resend.com/api-keys | Sending emails (required on Render; SMTP blocked) |
 
 ---
 
@@ -43,7 +43,8 @@ Use this checklist before creating your Render blueprint instance.
 | CRON_SECRET | No | Leave empty (or set + add to GitHub secrets for protection) |
 | GEMINI_API_KEY | **Yes** | Paste your key |
 | MY_EMAIL | **Yes** | Your email |
-| APP_PASSWORD | **Yes** | Gmail app password |
+| RESEND_API_KEY | **Yes** | Resend API key (from resend.com/api-keys) |
+| FROM_EMAIL | No | Sender (default: onboarding@resend.dev) |
 
 **DATABASE_URL** is set automatically by Render — you don't enter it.
 
