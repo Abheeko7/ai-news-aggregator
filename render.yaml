@@ -25,6 +25,7 @@ services:
     runtime: python
     plan: free
     branch: deployment
+    healthCheckPath: /health
     buildCommand: pip install -r requirements.txt && python app/database/create_tables.py
     startCommand: python run_api.py
     envVars:
