@@ -26,26 +26,40 @@ jobs:
           echo "🚀 Triggering newsletter pipeline..."
           echo "Service URL: $RENDER_URL"
           
-          CURL_CMD="curl -s -w '\n%{http_code}' -X POST '$RENDER_URL/trigger-newsletter' -H 'Content-Type: application/json'"
+          # Build curl command (add X-Cron-Secret only if CRON_SECRET is set)
+          CURL_CMD="curl -s -w '\n%{http_code}' -X POST '$RENDER_URL/trigger-newsletter' -H 'Content-Type: application/json' --max-time 300"
           if [ -n "$CRON_SECRET" ]; then
             CURL_CMD="$CURL_CMD -H 'X-Cron-Secret: $CRON_SECRET'"
           fi
           
-          response=$(eval "$CURL_CMD" || echo "000")
-          http_code=$(echo "$response" | tail -n1)
-          body=$(echo "$response" | head -n-1)
+          # Retry up to 3 times (Render free tier cold starts can take 60–90s)
+          max_attempts=3
+          attempt=1
+          http_code=000
           
-          echo "Response Code: $http_code"
-          echo "Response Body: $body"
+          while [ $attempt -le $max_attempts ]; do
+            echo "Attempt $attempt of $max_attempts..."
+            response=$(eval "$CURL_CMD" || echo "000")
+            http_code=$(echo "$response" | tail -n1)
+            body=$(echo "$response" | head -n-1)
+            
+            echo "Response Code: $http_code"
+            if [ "$http_code" = "200" ] || [ "$http_code" = "201" ]; then
+              echo "✅ Newsletter pipeline triggered successfully!"
+              echo "$body" | jq '.' 2>/dev/null || echo "$body"
+              exit 0
+            fi
+            
+            if [ $attempt -lt $max_attempts ]; then
+              echo "⚠️  Got $http_code (may be cold start). Waiting 45s before retry..."
+              sleep 45
+            fi
+            attempt=$((attempt + 1))
+          done
           
-          if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 201 ]; then
-            echo "✅ Newsletter pipeline triggered successfully!"
-            echo "$body" | jq '.' 2>/dev/null || echo "$body"
-          else
-            echo "❌ Failed to trigger newsletter. HTTP Code: $http_code"
-            echo "$body"
-            exit 1
-          fi
+          echo "❌ Failed to trigger newsletter after $max_attempts attempts. HTTP Code: $http_code"
+          echo "$body"
+          exit 1
       
       - name: Display Summary
         if: success()
