@@ -80,11 +80,18 @@ If you see a cron job section asking for env vars — **it should not appear** s
 
 **CRON_SECRET (optional):** If you left it empty in Render, leave this empty or don't create it. If you set it in Render, create the same secret here.
 
-### Step 2: Push Workflow to Repository
+### Step 2: Create Workflow File on GitHub
 
-The workflow file `.github/workflows/newsletter.yml` must be in your repo. If you've committed it to the `deployment` branch, you're good.
+The workflow file must be in your repo. Due to GitHub OAuth limits, you may need to **create it manually**:
 
-**Important:** For scheduled runs (`cron`), GitHub Actions uses the workflow from your **default branch** (usually `main`). If your default is `main`, merge the `deployment` branch into `main` so the workflow file is there, or change your default branch to `deployment`. Manual "Run workflow" works from any branch that has the file.
+1. Go to your repo → **Create new file**
+2. Path: `.github/workflows/newsletter.yml`
+3. Paste the content from the "Workflow File Content" section at the bottom of this guide
+4. Commit to `main` (or your default branch) so scheduled runs work
+
+**Alternative:** If you have `workflow` scope for GitHub, you can push the file from your local `.github/workflows/newsletter.yml`.
+
+**Important:** For scheduled runs (`cron`), GitHub Actions uses the workflow from your **default branch** (usually `main`). Create the file on `main` for scheduled runs to work. Manual "Run workflow" works from any branch.
 
 ### Step 3: Verify Workflow
 
@@ -92,6 +99,69 @@ The workflow file `.github/workflows/newsletter.yml` must be in your repo. If yo
 2. You should see "Daily Newsletter Trigger" workflow
 3. Click **Run workflow** (manual trigger) to test
 4. Check the run logs — it should POST to your Render URL and show success
+
+---
+
+## Workflow File Content (Copy for Manual Creation)
+
+If you create `.github/workflows/newsletter.yml` manually on GitHub, use this content:
+
+```yaml
+name: Daily Newsletter Trigger
+
+# Triggers the newsletter pipeline daily via Render /trigger-newsletter.
+# Uses GitHub Actions (free) instead of Render cron (paid).
+# Pipeline: scrape → process → digest → send to MY_EMAIL.
+
+on:
+  schedule:
+    - cron: '0 8 * * *'   # Daily at 8:00 AM UTC
+  workflow_dispatch:       # Manual trigger from GitHub Actions tab
+
+jobs:
+  trigger-newsletter:
+    runs-on: ubuntu-latest
+    name: Trigger Newsletter Pipeline
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Trigger Newsletter Endpoint
+        env:
+          RENDER_URL: ${{ secrets.RENDER_SERVICE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          echo "🚀 Triggering newsletter pipeline..."
+          echo "Service URL: $RENDER_URL"
+          
+          CURL_CMD="curl -s -w '\n%{http_code}' -X POST '$RENDER_URL/trigger-newsletter' -H 'Content-Type: application/json'"
+          if [ -n "$CRON_SECRET" ]; then
+            CURL_CMD="$CURL_CMD -H 'X-Cron-Secret: $CRON_SECRET'"
+          fi
+          
+          response=$(eval "$CURL_CMD" || echo "000")
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+          
+          echo "Response Code: $http_code"
+          echo "Response Body: $body"
+          
+          if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 201 ]; then
+            echo "✅ Newsletter pipeline triggered successfully!"
+            echo "$body" | jq '.' 2>/dev/null || echo "$body"
+          else
+            echo "❌ Failed to trigger newsletter. HTTP Code: $http_code"
+            echo "$body"
+            exit 1
+          fi
+      
+      - name: Display Summary
+        if: success()
+        run: |
+          echo "📧 Pipeline completed. Newsletter sent to MY_EMAIL."
+          echo "Check Render service logs for details."
+```
 
 ---
 
