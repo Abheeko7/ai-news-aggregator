@@ -47,40 +47,31 @@ Verify the branch exists at: `https://github.com/YOUR_USERNAME/ai-news-aggregato
 
 When Render shows the "Specified configurations" screen, you'll need to set these values:
 
-#### For Web Service (`ai-news-api`):
+#### For Web Service (`ai-news-api`) — only service that needs env vars:
 
 | Variable | Required | What to Enter |
 |----------|----------|---------------|
-| `CRON_SECRET` | **No** | Leave **empty** if using only Render cron. Otherwise, generate: `openssl rand -hex 24` |
+| `CRON_SECRET` | **No** | Leave **empty** (or set + add to GitHub secrets; see GITHUB_ACTIONS_SETUP.md) |
 | `GEMINI_API_KEY` | **Yes** | Your Google Gemini API key |
 | `MY_EMAIL` | **Yes** | Email address that receives newsletters (e.g., `yourname@gmail.com`) |
 | `APP_PASSWORD` | **Yes** | Gmail app password (16 characters, e.g., `abcd efgh ijkl mnop`) |
 
-#### For Cron Job (`ai-news-daily-pipeline`):
-
-| Variable | Required | What to Enter |
-|----------|----------|---------------|
-| `GEMINI_API_KEY` | **Yes** | Same as web service |
-| `MY_EMAIL` | **Yes** | Same as web service |
-| `APP_PASSWORD` | **Yes** | Same as web service |
-
-**Note:** `DATABASE_URL` is automatically set by Render - you don't need to enter it manually.
+**Note:** `DATABASE_URL` is automatically set by Render. **No cron job** — newsletter is triggered by GitHub Actions (free). See GITHUB_ACTIONS_SETUP.md.
 
 ---
 
 ### Step 4: Review & Deploy
 
-1. Review the configuration:
+1. Review the configuration (all FREE — no payment):
    - ✅ Database: `ai-news-aggregator-db` (free tier)
    - ✅ Web service: `ai-news-api` (free tier)
-   - ✅ Cron job: `ai-news-daily-pipeline` (starter plan - **$7/month**)
+   - ❌ No cron job (use GitHub Actions instead — see GITHUB_ACTIONS_SETUP.md)
 
 2. Click **"Apply"** or **"Create Blueprint"**
 
 3. Render will start creating resources:
    - Database creation (~2 minutes)
    - Web service build & deploy (~5-10 minutes)
-   - Cron job setup (~2 minutes)
 
 ---
 
@@ -90,7 +81,6 @@ Watch the deployment logs:
 
 1. **Database** should show ✅ "Create database ai-news-aggregator-db"
 2. **Web service** will build (installing dependencies, creating tables)
-3. **Cron job** will be configured
 
 **Expected build output:**
 ```
@@ -127,17 +117,17 @@ curl -X POST https://ai-news-api.onrender.com/trigger-newsletter \
   -H "X-Cron-Secret: your-secret-here"
 ```
 
-#### Test Cron Job Manually:
+#### Test via GitHub Actions:
 
-1. Go to Render Dashboard → **Cron Jobs** → `ai-news-daily-pipeline`
-2. Click **"Trigger Run"** to run it immediately
-3. Check logs to see the pipeline execution
+1. Go to your repo → **Actions** → **Daily Newsletter Trigger**
+2. Click **Run workflow** to trigger immediately
+3. Check logs — see GITHUB_ACTIONS_SETUP.md for full setup
 
 ---
 
 ## 📧 Step 7: Verify Email Delivery
 
-After the cron runs (or manual trigger):
+After triggering (manual curl or GitHub Actions):
 
 1. Check your email inbox (`MY_EMAIL`)
 2. Check spam folder if not found
@@ -167,12 +157,12 @@ After the cron runs (or manual trigger):
 - Check `APP_PASSWORD` is a Gmail app password (16 chars, not your regular password)
 - Check Render logs for SMTP errors
 
-### Issue: Cron job not running
+### Issue: Newsletter not triggering automatically
 
 **Solution:**
-- Verify cron job is on **starter plan** (paid) - free tier doesn't support cron
-- Check schedule: `0 8 * * *` means 8:00 AM UTC daily
-- Manually trigger a run to test
+- Use GitHub Actions (free) — see GITHUB_ACTIONS_SETUP.md
+- Ensure RENDER_SERVICE_URL secret is set in GitHub
+- For scheduled runs, workflow must be on default branch (main)
 
 ### Issue: API returns 401 Unauthorized
 
@@ -188,7 +178,8 @@ After the cron runs (or manual trigger):
 |----------|------|------|---------|
 | `ai-news-aggregator-db` | PostgreSQL | Free | Stores articles, digests |
 | `ai-news-api` | Web Service | Free | `/health`, `/trigger-newsletter` endpoints |
-| `ai-news-daily-pipeline` | Cron Job | Starter ($7/mo) | Runs `main.py` daily at 8 AM UTC |
+
+**Newsletter trigger:** GitHub Actions (free) — see GITHUB_ACTIONS_SETUP.md
 
 ---
 
@@ -196,9 +187,9 @@ After the cron runs (or manual trigger):
 
 - **Database (free tier):** $0/month
 - **Web service (free tier):** $0/month (spins down after inactivity)
-- **Cron job (starter):** **$7/month** (minimum)
+- **GitHub Actions:** $0/month
 
-**Total: ~$7/month** (plus any API usage costs for Gemini)
+**Total: $0/month** (plus any API usage costs for Gemini)
 
 ---
 
@@ -243,10 +234,9 @@ After deployment, verify:
 
 - [ ] Database created successfully
 - [ ] Web service is running (`/health` returns 200)
-- [ ] Cron job is scheduled (shows next run time)
-- [ ] Manual trigger works (`/trigger-newsletter`)
+- [ ] GitHub Actions workflow set up (RENDER_SERVICE_URL secret)
+- [ ] Manual trigger works (`/trigger-newsletter` or Run workflow)
 - [ ] Email received successfully
-- [ ] Cron job runs automatically (check logs after scheduled time)
 
 ---
 

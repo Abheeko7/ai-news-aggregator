@@ -1,21 +1,17 @@
-# Render Blueprint - AI News Aggregator
+# Render Blueprint - AI News Aggregator (FREE TIER ONLY - NO PAYMENT)
 # https://render.com/docs/blueprint-spec
 #
 # Deploy from branch: deployment
 #
-# Creates:
-# 1. PostgreSQL database (articles, digests)
-# 2. Web service: /health, /trigger-newsletter (run full pipeline → send to MY_EMAIL)
-# 3. Cron job: runs python main.py daily (scrape → process → digest → email)
+# Creates (all FREE - no card charges):
+# 1. PostgreSQL database (articles, digests) - free
+# 2. Web service: /health, /trigger-newsletter - free
 #
-# CRON_SECRET (web service only):
-# - Used only when something calls POST /trigger-newsletter (e.g. external cron, manual curl).
-# - Render cron runs main.py directly and does NOT use CRON_SECRET.
-# - If you set CRON_SECRET: generate with `openssl rand -hex 24` or
-#   `python -c "import secrets; print(secrets.token_urlsafe(32))"`, then paste
-#   into Render "Enter value" for CRON_SECRET. Use same value in X-Cron-Secret
-#   when calling /trigger-newsletter.
-# - If you use only Render cron and never call /trigger-newsletter: leave empty.
+# Newsletter is triggered by GitHub Actions (free) calling POST /trigger-newsletter.
+# NO Render cron job = NO payment required.
+#
+# CRON_SECRET: Set in Render + GitHub secrets to protect /trigger-newsletter.
+# Leave empty in both if you prefer no protection.
 
 databases:
   - name: ai-news-aggregator-db
@@ -41,30 +37,7 @@ services:
       - key: PORT
         value: "5000"
       - key: CRON_SECRET
-        sync: false   # Optional. Protect /trigger-newsletter; leave empty if only Render cron.
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: MY_EMAIL
-        sync: false
-      - key: APP_PASSWORD
-        sync: false
-
-  # Cron job: runs main.py daily. Requires paid plan (starter).
-  - type: cron
-    name: ai-news-daily-pipeline
-    runtime: python
-    plan: starter
-    branch: deployment
-    schedule: "0 8 * * *"   # Daily at 8:00 AM UTC
-    buildCommand: pip install -r requirements.txt && python app/database/create_tables.py
-    startCommand: python main.py
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: ai-news-aggregator-db
-          property: connectionString
-      - key: PYTHON_VERSION
-        value: "3.12.3"
+        sync: false   # Optional. Set in Render + GitHub secrets. Leave empty for no protection.
       - key: GEMINI_API_KEY
         sync: false
       - key: MY_EMAIL

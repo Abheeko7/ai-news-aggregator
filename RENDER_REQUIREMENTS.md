@@ -24,34 +24,26 @@ Use this checklist before creating your Render blueprint instance.
 
 ---
 
-## 🔧 What the Blueprint Creates
+## 🔧 What the Blueprint Creates (FREE ONLY - NO PAYMENT)
 
 | Resource | Type | Plan | Cost |
 |----------|------|------|------|
 | ai-news-aggregator-db | PostgreSQL | free | $0 |
 | ai-news-api | Web Service | free | $0 |
-| ai-news-daily-pipeline | Cron Job | starter | **$7/month** |
 
-> **Note:** Cron job requires a paid plan. If you skip the cron job, you can trigger the newsletter manually via `POST /trigger-newsletter` or use GitHub Actions (free).
+**Newsletter trigger:** GitHub Actions (free) — see GITHUB_ACTIONS_SETUP.md. No Render cron job = no charges.
 
 ---
 
 ## 📝 Environment Variables (Render will prompt you)
 
-### Web Service (ai-news-api)
+### Web Service (ai-news-api) ONLY
 | Variable | Required | Action |
 |----------|----------|--------|
-| CRON_SECRET | No | Leave empty (or generate for /trigger-newsletter protection) |
+| CRON_SECRET | No | Leave empty (or set + add to GitHub secrets for protection) |
 | GEMINI_API_KEY | **Yes** | Paste your key |
 | MY_EMAIL | **Yes** | Your email |
 | APP_PASSWORD | **Yes** | Gmail app password |
-
-### Cron Job (ai-news-daily-pipeline) - if using
-| Variable | Required | Action |
-|----------|----------|--------|
-| GEMINI_API_KEY | **Yes** | Same as web service |
-| MY_EMAIL | **Yes** | Same as web service |
-| APP_PASSWORD | **Yes** | Same as web service |
 
 **DATABASE_URL** is set automatically by Render — you don't enter it.
 
