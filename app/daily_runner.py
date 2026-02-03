@@ -9,6 +9,7 @@ from app.services.process_anthropic import process_anthropic_markdown
 from app.services.process_youtube import process_youtube_transcripts
 from app.services.process_digest import process_digests_per_source
 from app.services.process_email import send_newsletter
+from app.services.import_subscribers import import_subscribers
 from app.database.repository import Repository
 from app.api_config import (
     SCRAPE_HOURS, NEWSLETTER_HOURS, TOP_PER_SOURCE, TOTAL_FEATURED,
@@ -97,7 +98,23 @@ def run_daily_pipeline() -> dict:
         
         cleanup_result = repo.cleanup_all_old_data(retention_hours=DATA_RETENTION_HOURS)
         results["cleanup"] = cleanup_result
-        
+
+        # Step 0.5: Import subscribers from Google Sheets (if SUBSCRIBERS_CSV_URL is set)
+        logger.info("\n[0.5/6] 📥 Importing subscribers from Google Sheets...")
+        try:
+            import_result = import_subscribers()
+            results["import_subscribers"] = import_result
+            total_imported = import_result.get("imported", 0) + import_result.get("updated", 0)
+            if total_imported > 0:
+                logger.info(f"      ✓ Imported/updated {total_imported} subscribers")
+            elif import_result.get("errors", 0) > 0:
+                logger.warning(f"      ⚠ Import had {import_result['errors']} errors")
+            else:
+                logger.info(f"      ✓ No new subscribers to import (or SUBSCRIBERS_CSV_URL not set)")
+        except Exception as e:
+            logger.warning(f"      ⚠ Subscriber import failed (continuing): {e}")
+            results["import_subscribers"] = {"error": str(e)}
+
         # Show database stats after cleanup
         stats_after = repo.get_database_stats()
         logger.info(f"      After:  YouTube={stats_after['youtube_videos']}, "
@@ -161,8 +178,11 @@ def run_daily_pipeline() -> dict:
         
         if newsletter_result["success"]:
             logger.info(f"      ✓ Newsletter sent!")
-            logger.info(f"        Featured: {newsletter_result['featured_count']}")
-            logger.info(f"        Links: {newsletter_result['additional_count']}")
+            if "sent" in newsletter_result:
+                logger.info(f"        Sent: {newsletter_result['sent']}, Skipped: {newsletter_result.get('skipped', 0)}, Errors: {newsletter_result.get('errors', 0)}")
+            else:
+                logger.info(f"        Featured: {newsletter_result.get('featured_count', 0)}")
+                logger.info(f"        Links: {newsletter_result.get('additional_count', 0)}")
             results["success"] = True
         else:
             logger.error(f"      ✗ Failed: {newsletter_result.get('error', 'Unknown')}")
@@ -196,7 +216,8 @@ def run_daily_pipeline() -> dict:
                 f"OpenAI={final_stats['openai_articles']}, "
                 f"Anthropic={final_stats['anthropic_articles']}, "
                 f"F1={final_stats['f1_articles']}, "
-                f"Digests={final_stats['digests']}")
+                f"Digests={final_stats['digests']}, "
+                f"Subscribers={final_stats.get('subscribers', 0)}")
     logger.info("=" * 60)
     
     return results

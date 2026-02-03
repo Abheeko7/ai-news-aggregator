@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
 import logging
 from sqlalchemy.orm import Session
-from .models import YouTubeVideo, OpenAIArticle, AnthropicArticle, F1Article, Digest
+from .models import YouTubeVideo, OpenAIArticle, AnthropicArticle, F1Article, Digest, Subscriber
 from .connection import get_session
 
 logger = logging.getLogger(__name__)
@@ -837,6 +837,64 @@ class Repository:
         
         return results
     
+    # =========================================================================
+    # SUBSCRIBER METHODS
+    # =========================================================================
+
+    def list_active_subscribers(self) -> List[Dict[str, Any]]:
+        """Get all active subscribers for newsletter delivery."""
+        subs = self.session.query(Subscriber).filter(
+            Subscriber.active.in_(["true", "True", "1"])
+        ).all()
+        return [
+            {
+                "email": s.email,
+                "preferred_name": s.preferred_name or "there",
+                "youtube": str(s.youtube).lower() in ("true", "1", "yes"),
+                "openai": str(s.openai).lower() in ("true", "1", "yes"),
+                "anthropic": str(s.anthropic).lower() in ("true", "1", "yes"),
+                "f1": str(s.f1).lower() in ("true", "1", "yes"),
+            }
+            for s in subs
+        ]
+
+    def upsert_subscriber(
+        self,
+        email: str,
+        preferred_name: str = "there",
+        youtube: bool = True,
+        openai: bool = True,
+        anthropic: bool = True,
+        f1: bool = True,
+        active: bool = True,
+    ) -> Subscriber:
+        """Insert or update a subscriber (upsert by email)."""
+        existing = self.session.query(Subscriber).filter_by(email=email).first()
+        now = datetime.now(timezone.utc)
+        if existing:
+            existing.preferred_name = preferred_name or "there"
+            existing.youtube = "true" if youtube else "false"
+            existing.openai = "true" if openai else "false"
+            existing.anthropic = "true" if anthropic else "false"
+            existing.f1 = "true" if f1 else "false"
+            existing.active = "true" if active else "false"
+            existing.updated_at = now
+            self.session.commit()
+            return existing
+        else:
+            sub = Subscriber(
+                email=email,
+                preferred_name=preferred_name or "there",
+                youtube="true" if youtube else "false",
+                openai="true" if openai else "false",
+                anthropic="true" if anthropic else "false",
+                f1="true" if f1 else "false",
+                active="true" if active else "false",
+            )
+            self.session.add(sub)
+            self.session.commit()
+            return sub
+
     def get_database_stats(self) -> Dict[str, int]:
         """
         Get current record counts for all tables.
@@ -849,6 +907,9 @@ class Repository:
             "openai_articles": self.session.query(OpenAIArticle).count(),
             "anthropic_articles": self.session.query(AnthropicArticle).count(),
             "f1_articles": self.session.query(F1Article).count(),
-            "digests": self.session.query(Digest).count()
+            "digests": self.session.query(Digest).count(),
+            "subscribers": self.session.query(Subscriber).filter(
+                Subscriber.active.in_(["true", "True", "1"])
+            ).count(),
         }
 
