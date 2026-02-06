@@ -3,10 +3,12 @@ Flask API for triggering the newsletter pipeline on Render.
 
 Endpoints:
 - GET /health — Health check (for Render).
-- POST /trigger-newsletter — Run the full pipeline (scrape → process → send to MY_EMAIL).
+- POST /trigger-newsletter — Run the full pipeline (scrape → process → send).
+  Returns 202 immediately; pipeline runs in background (avoids 502 timeout).
   Optional X-Cron-Secret header when CRON_SECRET is set.
 """
 
+import threading
 from flask import Flask, request, jsonify
 from datetime import datetime
 import os
@@ -23,13 +25,21 @@ def health():
     return jsonify({"status": "healthy", "timestamp": datetime.utcnow().isoformat()})
 
 
+def _run_pipeline_background():
+    """Run the full pipeline in a background thread (avoids HTTP timeout)."""
+    try:
+        from app.daily_runner import run_daily_pipeline
+        run_daily_pipeline()
+    except Exception as e:
+        import logging
+        logging.error(f"Background pipeline failed: {e}")
+
+
 @app.route("/trigger-newsletter", methods=["POST"])
 def trigger_newsletter():
     """
-    Run the full newsletter pipeline (scrape → process → send to MY_EMAIL).
-
-    Used by Render cron jobs or external cron services.
-    When CRON_SECRET is set, require X-Cron-Secret header.
+    Start the newsletter pipeline in the background and return immediately.
+    Returns 202 Accepted to avoid 502 timeout (pipeline can take 5-10+ min).
     """
     cron_secret = os.getenv("CRON_SECRET")
     if cron_secret:
@@ -39,22 +49,13 @@ def trigger_newsletter():
         if provided != cron_secret:
             return jsonify({"error": "Unauthorized"}), 401
 
-    try:
-        from app.daily_runner import run_daily_pipeline
-
-        result = run_daily_pipeline()
-        return jsonify({
-            "success": result.get("success", False),
-            "message": "Pipeline executed",
-            "details": {
-                "duration_seconds": result.get("duration_seconds"),
-                "newsletter": result.get("newsletter"),
-                "scraping": result.get("scraping"),
-                "digests": result.get("digests"),
-            },
-        }), 200
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+    thread = threading.Thread(target=_run_pipeline_background, daemon=True)
+    thread.start()
+    return jsonify({
+        "success": True,
+        "message": "Pipeline started in background",
+        "status": "accepted",
+    }), 202
 
 
 if __name__ == "__main__":
