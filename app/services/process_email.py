@@ -11,7 +11,12 @@ from app.agent.curator_agent import CuratorAgent
 from app.profiles.user_profile import USER_PROFILE
 from app.database.repository import Repository
 from app.services.email_service import send_email
-from app.api_config import NEWSLETTER_HOURS, ADDITIONAL_LINKS_PER_SOURCE, TOTAL_FEATURED
+from app.api_config import (
+    NEWSLETTER_HOURS,
+    NEWSLETTER_LOOKBACK_HOURS,
+    ADDITIONAL_LINKS_PER_SOURCE,
+    TOTAL_FEATURED,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -53,12 +58,12 @@ def generate_newsletter_content(
     email_agent = EmailAgent(profile)
     
     logger.info(f"\n📧 GENERATING NEWSLETTER CONTENT")
-    logger.info(f"   Period: Last {hours} hours")
+    logger.info(f"   Period: Last {NEWSLETTER_LOOKBACK_HOURS} hours (fallback when no fresh content)")
     logger.info(f"   Featured: 1 per source (with AI digest)")
     logger.info(f"   Additional: {ADDITIONAL_LINKS_PER_SOURCE} links per source\n")
     
-    # Get recent digests (these are the featured articles with AI summaries)
-    digests = repo.get_recent_digests(hours=hours)
+    # Get recent digests - use lookback window so we always show latest available (even if older)
+    digests = repo.get_recent_digests(hours=NEWSLETTER_LOOKBACK_HOURS)
     
     # Organize digests by source
     featured = {
@@ -93,7 +98,7 @@ def generate_newsletter_content(
         exclude_ids.append(f"{digest['article_type']}:{digest['article_id']}")
     
     additional = repo.get_additional_articles_per_source(
-        hours=hours,
+        hours=NEWSLETTER_LOOKBACK_HOURS,
         limit_per_source=ADDITIONAL_LINKS_PER_SOURCE,
         exclude_ids=exclude_ids
     )
@@ -119,16 +124,41 @@ def filter_content_for_subscriber(
     content: dict,
     preferences: Dict[str, bool],
 ) -> dict:
-    """Filter featured and additional content by subscriber preferences (youtube, openai, anthropic, f1)."""
+    """
+    Filter content by subscriber preferences.
+    - Featured (top): Only preferred sources, ordered by preference
+    - Additional preferred: More links from preferred topics
+    - Additional other: Non-preferred sources as external links only
+    """
     sources = ["youtube", "openai", "anthropic", "f1"]
-    filtered_featured = {s: content["featured"].get(s) if preferences.get(s, True) else None for s in sources}
-    filtered_additional = {s: content["additional"].get(s, []) if preferences.get(s, True) else [] for s in sources}
-    featured_count = sum(1 for v in filtered_featured.values() if v is not None)
-    additional_count = sum(len(v) for v in filtered_additional.values())
+    preferred_sources = [s for s in sources if preferences.get(s, True)]
+
+    # Featured: only preferred sources, in source order (so subscriber's picks appear first)
+    featured_preferred = {s: content["featured"].get(s) for s in preferred_sources}
+    featured_preferred = {k: v for k, v in featured_preferred.items() if v is not None}
+
+    # Additional from preferred topics ("More from your topics")
+    additional_preferred = {s: content["additional"].get(s, []) for s in preferred_sources}
+    additional_preferred = {k: v for k, v in additional_preferred.items() if v}
+
+    # Non-preferred as external links only ("Other topics")
+    other_sources = [s for s in sources if s not in preferred_sources]
+    additional_other = {s: content["additional"].get(s, []) for s in other_sources}
+    additional_other = {k: v for k, v in additional_other.items() if v}
+
+    featured_count = len(featured_preferred)
+    additional_count = sum(len(v) for v in additional_preferred.values()) + sum(
+        len(v) for v in additional_other.values()
+    )
+
     return {
         **content,
-        "featured": filtered_featured,
-        "additional": filtered_additional,
+        "featured_preferred": featured_preferred,
+        "additional_preferred": additional_preferred,
+        "additional_other": additional_other,
+        "preferred_sources": preferred_sources,
+        "featured": featured_preferred,  # Backward compat for intro generation
+        "additional": {**additional_preferred, **additional_other},
         "featured_count": featured_count,
         "additional_count": additional_count,
     }
@@ -143,8 +173,10 @@ def _personalize_greeting(greeting: str, preferred_name: str) -> str:
 def newsletter_to_html(content: dict, preferred_name: Optional[str] = None) -> str:
     """Convert newsletter content to beautiful HTML email. Use preferred_name for greeting."""
     intro = content.get("introduction")
-    featured = content.get("featured", {})
-    additional = content.get("additional", {})
+    featured = content.get("featured_preferred", content.get("featured", {}))
+    preferred_sources = content.get("preferred_sources", ["youtube", "openai", "anthropic", "f1"])
+    additional_preferred = content.get("additional_preferred", content.get("additional", {}))
+    additional_other = content.get("additional_other", {})
     
     greeting = intro.greeting if intro else "Hello!"
     if preferred_name is not None:
@@ -267,8 +299,8 @@ def newsletter_to_html(content: dict, preferred_name: Optional[str] = None) -> s
             <div class="section-title">🌟 Featured Articles</div>
     """
     
-    # Add featured articles (1 per source)
-    for source in ["youtube", "openai", "anthropic", "f1"]:
+    # Add featured articles: only preferred topics, in preference order (top of newsletter)
+    for source in preferred_sources:
         config = source_config[source]
         article = featured.get(source)
         
@@ -289,22 +321,20 @@ def newsletter_to_html(content: dict, preferred_name: Optional[str] = None) -> s
                 <span class="source-badge" style="background: #ccc;">
                     {config['icon']} {config['name']}
                 </span>
-                <p class="no-article">No new articles from {config['name']} today</p>
+                <p class="no-article">No articles from {config['name']} right now</p>
             </div>
             """
     
-    # Add additional links section
-    has_additional = any(links for links in additional.values())
-    if has_additional:
+    # More from your topics (additional links from preferred sources)
+    has_preferred_links = any(links for links in additional_preferred.values())
+    if has_preferred_links:
         html += """
             <div class="more-links">
-                <div class="section-title">📚 More Articles</div>
+                <div class="section-title">📚 More from Your Topics</div>
         """
-        
-        for source in ["youtube", "openai", "anthropic", "f1"]:
+        for source in preferred_sources:
             config = source_config[source]
-            links = additional.get(source, [])
-            
+            links = additional_preferred.get(source, [])
             if links:
                 html += f"""
                 <div class="source-links">
@@ -317,7 +347,30 @@ def newsletter_to_html(content: dict, preferred_name: Optional[str] = None) -> s
                     </div>
                     """
                 html += "</div>"
-        
+        html += "</div>"
+    
+    # Other topics (non-preferred as external links only)
+    has_other_links = any(links for links in additional_other.values())
+    if has_other_links:
+        html += """
+            <div class="more-links">
+                <div class="section-title">🔗 Other Topics</div>
+        """
+        for source in ["youtube", "openai", "anthropic", "f1"]:
+            if source in additional_other and additional_other[source]:
+                config = source_config[source]
+                links = additional_other[source]
+                html += f"""
+                <div class="source-links">
+                    <div class="source-header">{config['icon']} {config['name']}</div>
+                """
+                for link in links:
+                    html += f"""
+                    <div class="link-item">
+                        <a href="{link['url']}">{link['title']}</a>
+                    </div>
+                    """
+                html += "</div>"
         html += "</div>"
     
     html += """
@@ -332,8 +385,10 @@ def newsletter_to_html(content: dict, preferred_name: Optional[str] = None) -> s
 def newsletter_to_text(content: dict, preferred_name: Optional[str] = None) -> str:
     """Convert newsletter content to plain text format. Use preferred_name for greeting."""
     intro = content.get("introduction")
-    featured = content.get("featured", {})
-    additional = content.get("additional", {})
+    featured = content.get("featured_preferred", content.get("featured", {}))
+    preferred_sources = content.get("preferred_sources", ["youtube", "openai", "anthropic", "f1"])
+    additional_preferred = content.get("additional_preferred", content.get("additional", {}))
+    additional_other = content.get("additional_other", {})
     
     greeting = intro.greeting if intro else "Hello!"
     if preferred_name is not None:
@@ -348,7 +403,7 @@ def newsletter_to_text(content: dict, preferred_name: Optional[str] = None) -> s
     text += "🌟 FEATURED ARTICLES\n"
     text += "=" * 50 + "\n\n"
     
-    for source in ["youtube", "openai", "anthropic", "f1"]:
+    for source in preferred_sources:
         icon = source_icons[source]
         article = featured.get(source)
         
@@ -360,20 +415,34 @@ def newsletter_to_text(content: dict, preferred_name: Optional[str] = None) -> s
             text += f"{article['summary']}\n\n"
             text += f"🔗 {article['url']}\n\n"
         else:
-            text += "No new articles today\n\n"
+            text += "No articles right now\n\n"
     
-    # Additional links
-    has_additional = any(links for links in additional.values())
-    if has_additional:
+    # More from your topics
+    has_preferred = any(links for links in additional_preferred.values())
+    if has_preferred:
         text += "=" * 50 + "\n"
-        text += "📚 MORE ARTICLES\n"
+        text += "📚 MORE FROM YOUR TOPICS\n"
         text += "=" * 50 + "\n\n"
-        
-        for source in ["youtube", "openai", "anthropic", "f1"]:
+        for source in preferred_sources:
             icon = source_icons[source]
-            links = additional.get(source, [])
-            
+            links = additional_preferred.get(source, [])
             if links:
+                text += f"{icon} {source.upper()}\n"
+                for link in links:
+                    text += f"  • {link['title']}\n"
+                    text += f"    {link['url']}\n"
+                text += "\n"
+    
+    # Other topics (external links)
+    has_other = any(links for links in additional_other.values())
+    if has_other:
+        text += "=" * 50 + "\n"
+        text += "🔗 OTHER TOPICS\n"
+        text += "=" * 50 + "\n\n"
+        for source in ["youtube", "openai", "anthropic", "f1"]:
+            if source in additional_other and additional_other[source]:
+                icon = source_icons[source]
+                links = additional_other[source]
                 text += f"{icon} {source.upper()}\n"
                 for link in links:
                     text += f"  • {link['title']}\n"

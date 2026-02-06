@@ -42,6 +42,10 @@ SCRAPE_HOURS = 24
 # 24 hours = past day's content
 NEWSLETTER_HOURS = 24
 
+# Fallback: when no fresh content in NEWSLETTER_HOURS, look back this far for latest available
+# 168 hours = 7 days - ensures we always show something even when sources have no new posts
+NEWSLETTER_LOOKBACK_HOURS = 168
+
 # TOP article from EACH SOURCE gets AI-generated summary
 # 1 from YouTube + 1 from OpenAI + 1 from Anthropic + 1 from F1 = 4 API calls
 TOP_PER_SOURCE = 1
