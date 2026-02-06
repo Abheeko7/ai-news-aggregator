@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
@@ -429,6 +430,8 @@ def send_newsletter(hours: int = None) -> dict:
                     )
                     sent += 1
                     logger.info(f"   ✓ Sent to {sub['email']}")
+                    # Small delay between sends to avoid rate limits (Gmail ~500/day; gentle on SMTP).
+                    time.sleep(0.6)
                 except Exception as e:
                     errors += 1
                     logger.error(f"   ✗ Failed {sub['email']}: {e}")

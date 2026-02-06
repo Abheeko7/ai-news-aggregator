@@ -634,6 +634,11 @@ class Repository:
     # DATA CLEANUP METHODS
     # =========================================================================
     
+    @staticmethod
+    def _naive_utc_cutoff(hours: int) -> datetime:
+        """Naive UTC cutoff for comparing with DB naive datetimes."""
+        return (datetime.now(timezone.utc) - timedelta(hours=hours)).replace(tzinfo=None)
+    
     def cleanup_old_youtube_videos(self, retention_hours: int = 168) -> int:
         """
         Delete YouTube videos older than retention_hours.
@@ -644,7 +649,7 @@ class Repository:
         Returns:
             Number of records deleted
         """
-        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=retention_hours)
+        cutoff_time = self._naive_utc_cutoff(retention_hours)
         
         # Get IDs of videos to delete
         old_videos = self.session.query(YouTubeVideo).filter(
@@ -681,7 +686,7 @@ class Repository:
         Returns:
             Number of records deleted
         """
-        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=retention_hours)
+        cutoff_time = self._naive_utc_cutoff(retention_hours)
         
         # Get articles to delete
         old_articles = self.session.query(OpenAIArticle).filter(
@@ -718,7 +723,7 @@ class Repository:
         Returns:
             Number of records deleted
         """
-        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=retention_hours)
+        cutoff_time = self._naive_utc_cutoff(retention_hours)
         
         # Get articles to delete
         old_articles = self.session.query(AnthropicArticle).filter(
@@ -755,7 +760,7 @@ class Repository:
         Returns:
             Number of records deleted
         """
-        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=retention_hours)
+        cutoff_time = self._naive_utc_cutoff(retention_hours)
         
         # Get articles to delete
         old_articles = self.session.query(F1Article).filter(
@@ -792,7 +797,7 @@ class Repository:
         Returns:
             Number of records deleted
         """
-        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=retention_hours)
+        cutoff_time = self._naive_utc_cutoff(retention_hours)
         
         count = self.session.query(Digest).filter(
             Digest.created_at < cutoff_time

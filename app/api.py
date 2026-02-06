@@ -35,6 +35,28 @@ def _run_pipeline_background():
         logging.error(f"Background pipeline failed: {e}")
 
 
+@app.route("/import-subscribers", methods=["GET", "POST"])
+def import_subscribers_endpoint():
+    """
+    Manually trigger subscriber import from Google Sheets.
+    Useful for testing SUBSCRIBERS_CSV_URL. Protected by CRON_SECRET if set.
+    """
+    cron_secret = os.getenv("CRON_SECRET")
+    if cron_secret:
+        provided = request.headers.get("X-Cron-Secret")
+        if request.is_json:
+            provided = provided or (request.json or {}).get("secret")
+        if provided != cron_secret:
+            return jsonify({"error": "Unauthorized"}), 401
+
+    try:
+        from app.services.import_subscribers import import_subscribers
+        result = import_subscribers()
+        return jsonify({"success": True, "result": result}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route("/trigger-newsletter", methods=["POST"])
 def trigger_newsletter():
     """

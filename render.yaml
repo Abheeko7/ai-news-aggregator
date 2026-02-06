@@ -1,17 +1,17 @@
-# Render Blueprint - AI News Aggregator (FREE TIER ONLY - NO PAYMENT)
+# Render Blueprint - AI News Aggregator
 # https://render.com/docs/blueprint-spec
 #
 # Deploy from branch: deployment
 #
-# Creates (all FREE - no card charges):
-# 1. PostgreSQL database (articles, digests) - free
-# 2. Web service: /health, /trigger-newsletter - free
+# Creates: PostgreSQL database + Web service (/health, /trigger-newsletter)
 #
-# Newsletter is triggered by GitHub Actions (free) calling POST /trigger-newsletter.
-# NO Render cron job = NO payment required.
+# Newsletter: Add a CRON JOB in Render Dashboard (New + → Cron Job)
+#   Command: python -m app.daily_runner
+#   Schedule: 0 8 * * * (daily 8 AM UTC)
+#   Env vars: DATABASE_URL, GEMINI_API_KEY, MY_EMAIL, APP_PASSWORD, SUBSCRIBERS_CSV_URL
+#   Gmail SMTP works on Render paid cron (SMTP ports allowed). No GitHub Actions needed.
 #
-# CRON_SECRET: Set in Render + GitHub secrets to protect /trigger-newsletter.
-# Leave empty in both if you prefer no protection.
+# CRON_SECRET: Optional. Set in Render to protect /trigger-newsletter for manual runs.
 
 databases:
   - name: ai-news-aggregator-db
@@ -42,9 +42,8 @@ services:
         sync: false
       - key: MY_EMAIL
         sync: false
-      - key: RESEND_API_KEY
-        sync: false
-      - key: FROM_EMAIL
-        sync: false
+      # Resend (commented - switched to Gmail): - key: RESEND_API_KEY / FROM_EMAIL
       - key: APP_PASSWORD
-        sync: false
+        sync: false   # Gmail App Password - required for sending
+      - key: SUBSCRIBERS_CSV_URL
+        sync: false   # Google Sheet CSV URL for subscribers

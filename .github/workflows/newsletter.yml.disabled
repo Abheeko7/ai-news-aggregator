@@ -1,0 +1,33 @@
+# DISABLED: Switched to Render Cron Job + Gmail. Newsletter now runs via Render cron.
+# To re-enable: rename this file to newsletter.yml (remove .disabled)
+#
+name: Daily Newsletter Trigger
+
+on:
+  schedule:
+    - cron: '30 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  trigger-newsletter:
+    runs-on: ubuntu-latest
+    name: Trigger Newsletter Pipeline
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Wake up Render (cold start)
+        env:
+          RENDER_URL: ${{ secrets.RENDER_SERVICE_URL }}
+        run: |
+          echo "Waking up Render service..."
+          curl -s -o /dev/null "$RENDER_URL/health" || true
+          sleep 90
+
+      - name: Trigger Newsletter Endpoint
+        env:
+          RENDER_URL: ${{ secrets.RENDER_SERVICE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl -s -X POST "$RENDER_URL/trigger-newsletter" -H "X-Cron-Secret: $CRON_SECRET" || exit 1

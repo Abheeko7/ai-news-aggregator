@@ -68,6 +68,7 @@ def import_subscribers(csv_url: str = None) -> dict:
         content = resp.text
         reader = csv.DictReader(io.StringIO(content))
         rows = list(reader)
+        fieldnames = reader.fieldnames or []
     except Exception as e:
         logger.error(f"Failed to parse CSV: {e}")
         results["errors"] = 1
@@ -77,23 +78,57 @@ def import_subscribers(csv_url: str = None) -> dict:
         logger.info("CSV is empty. No subscribers to import.")
         return results
 
+    logger.info(f"CSV columns: {fieldnames}, rows: {len(rows)}")
+
     # Normalize column names (allow email, Email, preferred_name, Preferred Name, etc.)
     def norm_key(k):
         return (k or "").strip().lower().replace(" ", "_").replace("-", "_")
 
+    def parse_row(row_norm: dict) -> tuple:
+        """Parse row - supports both Subscribers format and Form responses format."""
+        email = (row_norm.get("email") or "").strip()
+        if not email or "@" not in email:
+            return None
+
+        preferred_name = (row_norm.get("preferred_name") or "there").strip() or "there"
+
+        # Subscribers sheet format: explicit youtube, openai, anthropic, f1 columns
+        if "youtube" in row_norm or "openai" in row_norm:
+            return (
+                email,
+                preferred_name,
+                _parse_bool(row_norm.get("youtube")),
+                _parse_bool(row_norm.get("openai")),
+                _parse_bool(row_norm.get("anthropic")),
+                _parse_bool(row_norm.get("f1")),
+            )
+
+        # Form responses format: Topics column with "YouTube, OpenAI, Anthropic, Formula 1"
+        # Supports "Topics", "Which topics...", etc.
+        topics_str = (row_norm.get("topics") or "").lower()
+        if not topics_str:
+            for k, v in row_norm.items():
+                if "topic" in k and v:
+                    topics_str = str(v).lower()
+                    break
+        return (
+            email,
+            preferred_name,
+            "youtube" in topics_str,
+            "openai" in topics_str,
+            "anthropic" in topics_str,
+            "formula" in topics_str or "f1" in topics_str,
+        )
+
     for row in rows:
         try:
             row_norm = {norm_key(k): v for k, v in row.items()}
-            email = (row_norm.get("email") or "").strip()
-            if not email or "@" not in email:
+            parsed = parse_row(row_norm)
+            if parsed is None:
                 results["skipped"] += 1
                 continue
 
-            preferred_name = (row_norm.get("preferred_name") or "there").strip() or "there"
-            youtube = _parse_bool(row_norm.get("youtube"))
-            openai = _parse_bool(row_norm.get("openai"))
-            anthropic = _parse_bool(row_norm.get("anthropic"))
-            f1 = _parse_bool(row_norm.get("f1"))
+            email, preferred_name, youtube, openai, anthropic, f1 = parsed
 
             existing_sub = repo.session.query(Subscriber).filter_by(email=email).first()
 

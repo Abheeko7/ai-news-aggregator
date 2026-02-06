@@ -10,26 +10,28 @@ load_dotenv()
 
 MY_EMAIL = os.getenv("MY_EMAIL")
 APP_PASSWORD = os.getenv("APP_PASSWORD")
-RESEND_API_KEY = os.getenv("RESEND_API_KEY")
-# Resend verified sender. Use onboarding@resend.dev for testing, or your verified domain.
-FROM_EMAIL = os.getenv("FROM_EMAIL", "onboarding@resend.dev")
+
+# SWITCHED TO GMAIL: We use Gmail SMTP (Render paid cron allows port 465).
+# Resend code commented out below - can restore if reverting to Resend + domain.
+# RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+# FROM_EMAIL = os.getenv("FROM_EMAIL", "onboarding@resend.dev")
 
 
-def _send_via_resend(subject: str, body_text: str, body_html: str, recipients: list) -> None:
-    """Send email via Resend HTTP API (works on Render free tier)."""
-    import resend
-    resend.api_key = RESEND_API_KEY
-    params = {
-        "from": FROM_EMAIL,
-        "to": recipients,
-        "subject": subject,
-        "html": body_html if body_html else f"<pre>{html.escape(body_text)}</pre>",
-    }
-    resend.Emails.send(params)
+# def _send_via_resend(subject: str, body_text: str, body_html: str, recipients: list) -> None:
+#     """Send email via Resend HTTP API (works on Render free tier). COMMENTED: Switched to Gmail."""
+#     import resend
+#     resend.api_key = RESEND_API_KEY
+#     params = {
+#         "from": FROM_EMAIL,
+#         "to": recipients,
+#         "subject": subject,
+#         "html": body_html if body_html else f"<pre>{html.escape(body_text)}</pre>",
+#     }
+#     resend.Emails.send(params)
 
 
 def _send_via_smtp(subject: str, body_text: str, body_html: str, recipients: list) -> None:
-    """Send email via Gmail SMTP (for local development)."""
+    """Send email via Gmail SMTP. Works on Render paid cron (SMTP allowed); works locally."""
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = MY_EMAIL
@@ -60,15 +62,14 @@ def send_email(subject: str, body_text: str, body_html: str = None, recipients: 
     if not MY_EMAIL:
         raise ValueError("MY_EMAIL environment variable is not set")
 
-    # Prefer Resend when API key is set (works on Render free tier; SMTP is blocked)
-    if RESEND_API_KEY:
-        _send_via_resend(subject, body_text, body_html or "", recipients)
-    elif APP_PASSWORD:
+    # Gmail SMTP: requires APP_PASSWORD (Gmail App Password). Works on Render paid cron + locally.
+    # Resend path commented out - see _send_via_resend above if reverting.
+    if APP_PASSWORD:
         _send_via_smtp(subject, body_text, body_html or "", recipients)
     else:
         raise ValueError(
-            "Set either RESEND_API_KEY (for Resend) or APP_PASSWORD (for Gmail SMTP). "
-            "Resend is required for Render deployment; Gmail works locally."
+            "APP_PASSWORD (Gmail App Password) is required. "
+            "Generate at: Google Account → Security → App passwords."
         )
 
 
