@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from typing import Dict, Any, List, Optional
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -18,8 +19,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Placeholder for multi-user greeting (replaced with subscriber's preferred_name)
+GREETING_PLACEHOLDER = "{{NAME}}"
 
-def generate_newsletter_content(hours: int = None) -> dict:
+
+def generate_newsletter_content(
+    hours: int = None,
+    use_placeholder_greeting: bool = False,
+) -> dict:
     """
     Generate newsletter with 1 featured article per source + additional links.
     
@@ -32,6 +39,7 @@ def generate_newsletter_content(hours: int = None) -> dict:
     
     Args:
         hours: How far back to look. Defaults to NEWSLETTER_HOURS (24).
+        use_placeholder_greeting: If True, use {{NAME}} in greeting for multi-user personalization.
     
     Returns:
         dict with featured articles and additional links per source
@@ -40,7 +48,8 @@ def generate_newsletter_content(hours: int = None) -> dict:
         hours = NEWSLETTER_HOURS
     
     repo = Repository()
-    email_agent = EmailAgent(USER_PROFILE)
+    profile = {**USER_PROFILE, "name": GREETING_PLACEHOLDER} if use_placeholder_greeting else USER_PROFILE
+    email_agent = EmailAgent(profile)
     
     logger.info(f"\n📧 GENERATING NEWSLETTER CONTENT")
     logger.info(f"   Period: Last {hours} hours")
@@ -105,11 +114,40 @@ def generate_newsletter_content(hours: int = None) -> dict:
     }
 
 
-def newsletter_to_html(content: dict) -> str:
-    """Convert newsletter content to beautiful HTML email."""
+def filter_content_for_subscriber(
+    content: dict,
+    preferences: Dict[str, bool],
+) -> dict:
+    """Filter featured and additional content by subscriber preferences (youtube, openai, anthropic, f1)."""
+    sources = ["youtube", "openai", "anthropic", "f1"]
+    filtered_featured = {s: content["featured"].get(s) if preferences.get(s, True) else None for s in sources}
+    filtered_additional = {s: content["additional"].get(s, []) if preferences.get(s, True) else [] for s in sources}
+    featured_count = sum(1 for v in filtered_featured.values() if v is not None)
+    additional_count = sum(len(v) for v in filtered_additional.values())
+    return {
+        **content,
+        "featured": filtered_featured,
+        "additional": filtered_additional,
+        "featured_count": featured_count,
+        "additional_count": additional_count,
+    }
+
+
+def _personalize_greeting(greeting: str, preferred_name: str) -> str:
+    """Replace placeholder with subscriber's preferred name."""
+    name = (preferred_name or "there").strip() or "there"
+    return greeting.replace(GREETING_PLACEHOLDER, name)
+
+
+def newsletter_to_html(content: dict, preferred_name: Optional[str] = None) -> str:
+    """Convert newsletter content to beautiful HTML email. Use preferred_name for greeting."""
     intro = content.get("introduction")
     featured = content.get("featured", {})
     additional = content.get("additional", {})
+    
+    greeting = intro.greeting if intro else "Hello!"
+    if preferred_name is not None:
+        greeting = _personalize_greeting(greeting, preferred_name)
     
     # Source icons and colors
     source_config = {
@@ -222,7 +260,7 @@ def newsletter_to_html(content: dict) -> str:
     </head>
     <body>
         <div class="container">
-            <p class="greeting">{intro.greeting if intro else 'Hello!'}</p>
+            <p class="greeting">{greeting}</p>
             <p class="intro">{intro.introduction if intro else 'Here are your top AI news articles from the past 24 hours.'}</p>
             
             <div class="section-title">🌟 Featured Articles</div>
@@ -290,15 +328,19 @@ def newsletter_to_html(content: dict) -> str:
     return html
 
 
-def newsletter_to_text(content: dict) -> str:
-    """Convert newsletter content to plain text format."""
+def newsletter_to_text(content: dict, preferred_name: Optional[str] = None) -> str:
+    """Convert newsletter content to plain text format. Use preferred_name for greeting."""
     intro = content.get("introduction")
     featured = content.get("featured", {})
     additional = content.get("additional", {})
     
+    greeting = intro.greeting if intro else "Hello!"
+    if preferred_name is not None:
+        greeting = _personalize_greeting(greeting, preferred_name)
+    
     source_icons = {"youtube": "🎬", "openai": "🤖", "anthropic": "🧠", "f1": "🏎️"}
     
-    text = f"{intro.greeting if intro else 'Hello!'}\n\n"
+    text = f"{greeting}\n\n"
     text += f"{intro.introduction if intro else 'Here are your top AI news articles.'}\n\n"
     
     text += "=" * 50 + "\n"
@@ -342,52 +384,98 @@ def newsletter_to_text(content: dict) -> str:
 
 def send_newsletter(hours: int = None) -> dict:
     """
-    Generate and send the newsletter email.
-    
+    Generate and send the newsletter email to all active subscribers.
+    If no subscribers, falls back to MY_EMAIL (single-user mode).
+
     Args:
         hours: How far back to look. Defaults to NEWSLETTER_HOURS (24).
-    
+
     Returns:
         dict with success status and details
     """
     if hours is None:
         hours = NEWSLETTER_HOURS
-    
+
     try:
-        logger.info(f"\n📧 SENDING NEWSLETTER")
-        logger.info(f"   Expected API calls: 2 (curator + email intro)\n")
-        
-        content = generate_newsletter_content(hours=hours)
-        
-        if content["featured_count"] == 0 and content["additional_count"] == 0:
-            logger.warning("No content to send")
+        repo = Repository()
+        subscribers = repo.list_active_subscribers()
+
+        if subscribers:
+            logger.info(f"\n📧 SENDING NEWSLETTER TO {len(subscribers)} SUBSCRIBERS")
+            content = generate_newsletter_content(hours=hours, use_placeholder_greeting=True)
+            sent = 0
+            skipped = 0
+            errors = 0
+
+            for sub in subscribers:
+                prefs = {"youtube": sub["youtube"], "openai": sub["openai"], "anthropic": sub["anthropic"], "f1": sub["f1"]}
+                filtered = filter_content_for_subscriber(content, prefs)
+
+                if filtered["featured_count"] == 0 and filtered["additional_count"] == 0:
+                    logger.info(f"   Skipping {sub['email']}: no content for selected topics")
+                    skipped += 1
+                    continue
+
+                try:
+                    html_content = newsletter_to_html(filtered, preferred_name=sub["preferred_name"])
+                    text_content = newsletter_to_text(filtered, preferred_name=sub["preferred_name"])
+                    subject = f"AI News Digest - {datetime.now().strftime('%B %d, %Y')}"
+
+                    send_email(
+                        subject=subject,
+                        body_text=text_content,
+                        body_html=html_content,
+                        recipients=[sub["email"]],
+                    )
+                    sent += 1
+                    logger.info(f"   ✓ Sent to {sub['email']}")
+                except Exception as e:
+                    errors += 1
+                    logger.error(f"   ✗ Failed {sub['email']}: {e}")
+
             return {
-                "success": False,
-                "error": "No articles found for newsletter"
+                "success": sent > 0,
+                "subject": f"AI News Digest - {datetime.now().strftime('%B %d, %Y')}",
+                "sent": sent,
+                "skipped": skipped,
+                "errors": errors,
+                "total_subscribers": len(subscribers),
             }
-        
-        html_content = newsletter_to_html(content)
-        text_content = newsletter_to_text(content)
-        
-        subject = f"AI News Digest - {datetime.now().strftime('%B %d, %Y')}"
-        
-        send_email(
-            subject=subject,
-            body_text=text_content,
-            body_html=html_content
-        )
-        
-        logger.info(f"\n✅ Newsletter sent!")
-        logger.info(f"   Featured: {content['featured_count']} articles")
-        logger.info(f"   Additional: {content['additional_count']} links")
-        
-        return {
-            "success": True,
-            "subject": subject,
-            "featured_count": content["featured_count"],
-            "additional_count": content["additional_count"]
-        }
-        
+        else:
+            # Fallback: single-user mode (MY_EMAIL)
+            logger.info(f"\n📧 SENDING NEWSLETTER (single user: MY_EMAIL)")
+            logger.info(f"   Expected API calls: 2 (curator + email intro)\n")
+
+            content = generate_newsletter_content(hours=hours, use_placeholder_greeting=False)
+
+            if content["featured_count"] == 0 and content["additional_count"] == 0:
+                logger.warning("No content to send")
+                return {
+                    "success": False,
+                    "error": "No articles found for newsletter"
+                }
+
+            html_content = newsletter_to_html(content, preferred_name=None)
+            text_content = newsletter_to_text(content, preferred_name=None)
+            subject = f"AI News Digest - {datetime.now().strftime('%B %d, %Y')}"
+
+            send_email(
+                subject=subject,
+                body_text=text_content,
+                body_html=html_content,
+            )
+
+            logger.info(f"\n✅ Newsletter sent!")
+            logger.info(f"   Featured: {content['featured_count']} articles")
+            logger.info(f"   Additional: {content['additional_count']} links")
+
+            return {
+                "success": True,
+                "subject": subject,
+                "featured_count": content["featured_count"],
+                "additional_count": content["additional_count"],
+            }
+
     except Exception as e:
         logger.error(f"Error: {e}")
         return {

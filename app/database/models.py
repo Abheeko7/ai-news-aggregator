@@ -63,6 +63,21 @@ class F1Article(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class Subscriber(Base):
+    """Newsletter subscribers with preferences (from Google Form → import)."""
+    __tablename__ = "subscribers"
+    
+    email = Column(String, primary_key=True)
+    preferred_name = Column(String, nullable=False, default="there")
+    youtube = Column(String, nullable=False, default="true")   # "true" or "false"
+    openai = Column(String, nullable=False, default="true")
+    anthropic = Column(String, nullable=False, default="true")
+    f1 = Column(String, nullable=False, default="true")
+    active = Column(String, nullable=False, default="true")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class Digest(Base):
     __tablename__ = "digests"
     

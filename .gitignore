@@ -107,3 +107,10 @@ TUTORIAL.md
 
 # Test files (personal testing)
 test_*.py
+
+# Deployment and Render configuration files
+render.yaml
+RENDER_DEPLOYMENT_GUIDE.md
+run_api.py
+app/api.py
+requirements.txt
