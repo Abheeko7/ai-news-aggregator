@@ -1,0 +1,50 @@
+# Render Blueprint - AI News Aggregator (FREE TIER ONLY - NO PAYMENT)
+# https://render.com/docs/blueprint-spec
+#
+# Deploy from branch: deployment
+#
+# Creates (all FREE - no card charges):
+# 1. PostgreSQL database (articles, digests) - free
+# 2. Web service: /health, /trigger-newsletter - free
+#
+# Newsletter is triggered by GitHub Actions (free) calling POST /trigger-newsletter.
+# NO Render cron job = NO payment required.
+#
+# CRON_SECRET: Set in Render + GitHub secrets to protect /trigger-newsletter.
+# Leave empty in both if you prefer no protection.
+
+databases:
+  - name: ai-news-aggregator-db
+    plan: free
+    databaseName: ai_news_aggregator
+    user: ai_news_user
+
+services:
+  - type: web
+    name: ai-news-api
+    runtime: python
+    plan: free
+    branch: deployment
+    healthCheckPath: /health
+    buildCommand: pip install -r requirements.txt && python app/database/create_tables.py
+    startCommand: python run_api.py
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-news-aggregator-db
+          property: connectionString
+      - key: PYTHON_VERSION
+        value: "3.12.3"
+      # PORT: Do NOT set. Render injects PORT (default 10000) - override causes 502.
+      - key: CRON_SECRET
+        sync: false   # Optional. Set in Render + GitHub secrets. Leave empty for no protection.
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MY_EMAIL
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: FROM_EMAIL
+        sync: false
+      - key: APP_PASSWORD
+        sync: false

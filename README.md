@@ -216,9 +216,14 @@ Required environment variables:
 # AI API
 GEMINI_API_KEY=your_gemini_api_key
 
-# Email Configuration
+# Email Configuration (Resend for Render; Gmail SMTP for local)
 MY_EMAIL=your_email@gmail.com
-APP_PASSWORD=your_gmail_app_password
+RESEND_API_KEY=re_xxx    # From resend.com/api-keys (required on Render)
+FROM_EMAIL=onboarding@resend.dev
+# APP_PASSWORD=xxx       # Optional: Gmail app password for local SMTP
+
+# Multi-user: Google Sheet (Subscribers) published as CSV
+# SUBSCRIBERS_CSV_URL=https://docs.google.com/spreadsheets/d/xxx/export?format=csv&gid=yyy
 
 # Database (local development)
 POSTGRES_USER=postgres
