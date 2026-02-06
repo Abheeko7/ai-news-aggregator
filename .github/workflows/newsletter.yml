@@ -38,7 +38,7 @@ jobs:
           echo "Response Code: $http_code"
           echo "Response Body: $body"
           
-          if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 201 ]; then
+          if [ "$http_code" -eq 200 ] || [ "$http_code" -eq 201 ] || [ "$http_code" = "202" ]; then
             echo "✅ Newsletter pipeline triggered successfully!"
             echo "$body" | jq '.' 2>/dev/null || echo "$body"
           else
