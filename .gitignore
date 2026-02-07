@@ -109,6 +109,8 @@ TUTORIAL.md
 test_*.py
 
 # Deployment and Render configuration files
+# Disabled workflow (causes GitHub OAuth push errors if tracked)
+.github/workflows/newsletter.yml.disabled
 render.yaml
 RENDER_DEPLOYMENT_GUIDE.md
 run_api.py
