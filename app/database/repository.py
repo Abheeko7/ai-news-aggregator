@@ -666,10 +666,10 @@ class Repository:
                     Digest.article_id == video.video_id
                 ).delete()
             
-            # Delete the videos
+            # Delete the videos (synchronize_session=False avoids naive/aware datetime comparison in Python)
             self.session.query(YouTubeVideo).filter(
                 YouTubeVideo.published_at < cutoff_time
-            ).delete()
+            ).delete(synchronize_session=False)
             
             self.session.commit()
             logger.info(f"Deleted {count} old YouTube videos (older than {retention_hours}h)")
@@ -706,7 +706,7 @@ class Repository:
             # Delete the articles
             self.session.query(OpenAIArticle).filter(
                 OpenAIArticle.published_at < cutoff_time
-            ).delete()
+            ).delete(synchronize_session=False)
             
             self.session.commit()
             logger.info(f"Deleted {count} old OpenAI articles (older than {retention_hours}h)")
@@ -743,7 +743,7 @@ class Repository:
             # Delete the articles
             self.session.query(AnthropicArticle).filter(
                 AnthropicArticle.published_at < cutoff_time
-            ).delete()
+            ).delete(synchronize_session=False)
             
             self.session.commit()
             logger.info(f"Deleted {count} old Anthropic articles (older than {retention_hours}h)")
@@ -780,7 +780,7 @@ class Repository:
             # Delete the articles
             self.session.query(F1Article).filter(
                 F1Article.published_at < cutoff_time
-            ).delete()
+            ).delete(synchronize_session=False)
             
             self.session.commit()
             logger.info(f"Deleted {count} old F1 articles (older than {retention_hours}h)")
@@ -801,7 +801,7 @@ class Repository:
         
         count = self.session.query(Digest).filter(
             Digest.created_at < cutoff_time
-        ).delete()
+        ).delete(synchronize_session=False)
         
         if count > 0:
             self.session.commit()
